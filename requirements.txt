@@ -1,0 +1,5 @@
+torch>=0.4.0
+pillow
+matplotlib
+scikit-image
+cv2
