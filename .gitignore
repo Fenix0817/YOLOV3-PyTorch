@@ -1,5 +1,6 @@
 __pycache__
 *.pyc
-./checkpoints/*.weights
-./weights/*
-./handsup/*
+checkpoints/*.weights
+weights/
+handsup/
+sample/
