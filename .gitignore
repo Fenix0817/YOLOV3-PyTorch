@@ -4,3 +4,4 @@ checkpoints/*.weights
 weights/
 handsup/
 sample/
+*.zip

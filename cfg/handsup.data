@@ -1,0 +1,6 @@
+classes = 1
+train = sample/handsup_train.txt
+valid = sample/handsup_test.txt
+names =  data/handsup.names
+backup = backup
+
