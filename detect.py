@@ -108,8 +108,3 @@ if __name__ ==  '__main__':
         output = cv2.merge([img[...,2],img[...,1],img[...,0]])
         cv2.imwrite(parameters.save_path+str(img_i)+'.jpg', output)
     
-    
-        
-        
-    
-    

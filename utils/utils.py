@@ -54,35 +54,29 @@ def createModules(blocks):
                 pad = (kernel_size - 1) // 2
             else:
                 pad = 0
-            #Add the convolutional layer
+
             conv = nn.Conv2d(prev_filters, filters, kernel_size, stride, pad, bias = bias)
             module.add_module("conv_{0}".format(index), conv)
-            #Add the Batch Norm Layer
             if batch_normalize:
                 bn = nn.BatchNorm2d(filters)
                 module.add_module("batch_norm_{0}".format(index), bn)
-            #Check the activation. 
-            #It is either Linear or a Leaky ReLU for YOLO
+
             if activation == "leaky":
                 activn = nn.LeakyReLU(0.1, inplace = True)
                 module.add_module("leaky_{0}".format(index), activn)
-        #If it's an upsampling layer
-        #We use Bilinear2dUpsampling
+
         elif (x["type"] == "upsample"):
             stride = int(x["stride"])
             upsample = nn.Upsample(scale_factor = 2, mode = "nearest")
             module.add_module("upsample_{}".format(index), upsample)
-        #If it is a route layer
+
         elif (x["type"] == "route"):
             x["layers"] = x["layers"].split(',')
-            #Start  of a route
             start = int(x["layers"][0])
-            #end, if there exists one.
             try:
                 end = int(x["layers"][1])
             except:
                 end = 0
-            #Positive anotation
             if start > 0: 
                 start = start - index
             
@@ -96,21 +90,11 @@ def createModules(blocks):
             else:
                 filters= output_filters[index + start]
                         
-        #shortcut corresponds to skip connection
         elif x["type"] == "shortcut":
             from_ = int(x["from"])
             shortcut = EmptyLayer()
             module.add_module("shortcut_{}".format(index), shortcut)
             
-        elif x["type"] == "maxpool":
-            stride = int(x["stride"])
-            size = int(x["size"])
-            if stride != 1:
-                maxpool = nn.MaxPool2d(size, stride)
-            else:
-                maxpool = MaxPoolStride1(size)
-            module.add_module("maxpool_{}".format(index), maxpool)
-        #Yolo is the detection layer
         elif x["type"] == "yolo":
             mask = x["mask"].split(",")
             mask = [int(x) for x in mask]
@@ -162,62 +146,41 @@ def nonMaxSuppression(prediction, confidence, num_classes, nms = True, nms_conf 
     box_a[:,:,3] = (prediction[:,:,1] + prediction[:,:,3]/2)
     prediction[:,:,:4] = box_a[:,:,:4]
     
-
     batch_size = prediction.size(0)
     
     output = prediction.new(1, prediction.size(2) + 1)
     write = False
 
-
     for ind in range(batch_size):
-        #select the image from the batch
         image_pred = prediction[ind]
         
-        #Get the class having maximum score, and the index of that class
-        #Get rid of num_classes softmax scores 
-        #Add the class index and the class score of class having maximum score
         max_conf, max_conf_score = torch.max(image_pred[:,5:5+ num_classes], 1)
         max_conf = max_conf.float().unsqueeze(1)
         max_conf_score = max_conf_score.float().unsqueeze(1)
         seq = (image_pred[:,:5], max_conf, max_conf_score)
         image_pred = torch.cat(seq, 1)
         
-
-        
-        #Get rid of the zero entries
         non_zero_ind =  (torch.nonzero(image_pred[:,4]))
 
         
         image_pred_ = image_pred[non_zero_ind.squeeze(),:].view(-1,7)
         
-        #Get the various classes detected in the image
         try:
             img_classes = unique(image_pred_[:,-1])
         except:
              continue
-        #WE will do NMS classwise
         for cls in img_classes:
-            #get the detections with one particular class
             cls_mask = image_pred_*(image_pred_[:,-1] == cls).float().unsqueeze(1)
             class_mask_ind = torch.nonzero(cls_mask[:,-2]).squeeze()
             
-
             image_pred_class = image_pred_[class_mask_ind].view(-1,7)
 
-		
-        
-             #sort the detections such that the entry with the maximum objectness
-             #confidence is at the top
             conf_sort_index = torch.sort(image_pred_class[:,4], descending = True )[1]
             image_pred_class = image_pred_class[conf_sort_index]
             idx = image_pred_class.size(0)
             
-            #if nms has to be done
             if nms:
-                #For each detection
                 for i in range(idx):
-                    #Get the IOUs of all boxes that come after the one we are looking at 
-                    #in the loop
                     try:
                         ious = bboxIOU(image_pred_class[i].unsqueeze(0), image_pred_class[i+1:],True)
                     except ValueError:
@@ -226,22 +189,11 @@ def nonMaxSuppression(prediction, confidence, num_classes, nms = True, nms_conf 
                     except IndexError:
                         break
                     
-                    #Zero out all the detections that have IoU > treshhold
                     iou_mask = (ious < nms_conf).float().unsqueeze(1)
                     image_pred_class[i+1:] *= iou_mask       
                     
-                    #Remove the non-zero entries
                     non_zero_ind = torch.nonzero(image_pred_class[:,4]).squeeze()
                     image_pred_class = image_pred_class[non_zero_ind].view(-1,7)
-                    
-                    
-
-            #Concatenate the batch_id of the image to the detection
-            #this helps us identify which image does the detection correspond to 
-            #We use a linear straucture to hold ALL the detections from the batch
-            #the batch_dim is flattened
-            #batch is identified by extra batch column
-            
             
             batch_ind = image_pred_class.new(image_pred_class.size(0), 1).fill_(ind)
             seq = batch_ind, image_pred_class
@@ -382,32 +334,16 @@ def prepImage(img, img_size):
     return orig_img, input_img
 
 def bboxIOUNumpy(box1, box2):
-    """Computes IoU between bounding boxes.
-    Parameters
-    ----------
-    box1 : ndarray
-        (N, 4) shaped array with bboxes
-    box2 : ndarray
-        (M, 4) shaped array with bboxes
-    Returns
-    -------
-    : ndarray
-        (N, M) shaped array with IoUs
-    """
     area = (box2[:, 2] - box2[:, 0]) * (box2[:, 3] - box2[:, 1])
 
     iw = np.minimum(np.expand_dims(box1[:, 2], axis=1), box2[:, 2]) - np.maximum(
-        np.expand_dims(box1[:, 0], 1), box2[:, 0]
-    )
+        np.expand_dims(box1[:, 0], 1), box2[:, 0])
     ih = np.minimum(np.expand_dims(box1[:, 3], axis=1), box2[:, 3]) - np.maximum(
-        np.expand_dims(box1[:, 1], 1), box2[:, 1]
-    )
-
+        np.expand_dims(box1[:, 1], 1), box2[:, 1])
     iw = np.maximum(iw, 0)
     ih = np.maximum(ih, 0)
 
     ua = np.expand_dims((box1[:, 2] - box1[:, 0]) * (box1[:, 3] - box1[:, 1]), axis=1) + area - iw * ih
-
     ua = np.maximum(ua, np.finfo(float).eps)
 
     intersection = iw * ih

@@ -10,8 +10,9 @@ class YOLOLayer(nn.Module):
         super(YOLOLayer, self).__init__()
         self.anchors = anchors
         self.mse_loss = nn.MSELoss(reduction='elementwise_mean')
-        self.bce_loss = nn.BCELoss(reduction='elementwise_mean')
         self.ce_loss = nn.CrossEntropyLoss() 
+        self.lambda_coord = 5
+        self.lambda_noobj = 0.5
     
     def forward(self, prediction, img_size, num_classes, CUDA, targets=None):
         anchors = self.anchors
@@ -22,7 +23,6 @@ class YOLOLayer(nn.Module):
         num_anchors = len(anchors)
 
         prediction = prediction.view(batch_size, num_anchors, bbox_attrs, grid_size, grid_size).permute(0, 1, 3, 4, 2).contiguous()
-        
 
         scaled_anchors = torch.FloatTensor([(a[0]/stride, a[1]/stride) for a in anchors])
 
@@ -34,7 +34,6 @@ class YOLOLayer(nn.Module):
         pred_conf = torch.sigmoid(prediction[..., 4])
         pred_cls = torch.sigmoid(prediction[..., 5:])
 
-        
         if CUDA:
             FloatTensor = torch.cuda.FloatTensor
             LongTensor = torch.cuda.LongTensor
@@ -56,7 +55,6 @@ class YOLOLayer(nn.Module):
 
             if x.is_cuda:
                 self.mse_loss = self.mse_loss.cuda()
-                self.bce_loss = self.bce_loss.cuda()
                 self.ce_loss = self.ce_loss.cuda()
 
             nGT, nCorrect, mask, conf_mask, tx, ty, tw, th, tconf, tcls = utils.buildTargets(
@@ -93,12 +91,12 @@ class YOLOLayer(nn.Module):
             conf_mask_false = conf_mask - mask
 
             # Mask outputs to ignore non-existing objects
-            loss_x = self.mse_loss(x[mask], tx[mask])
-            loss_y = self.mse_loss(y[mask], ty[mask])
-            loss_w = self.mse_loss(w[mask], tw[mask])
-            loss_h = self.mse_loss(h[mask], th[mask])
+            loss_x = self.lambda_coord * self.mse_loss(x[mask], tx[mask])
+            loss_y = self.lambda_coord * self.mse_loss(y[mask], ty[mask])
+            loss_w = self.lambda_coord * self.mse_loss(w[mask], tw[mask])
+            loss_h = self.lambda_coord * self.mse_loss(h[mask], th[mask])
 
-            loss_conf = self.bce_loss(pred_conf[conf_mask_false], tconf[conf_mask_false]) + self.bce_loss(
+            loss_conf = self.lambda_noobj * self.mse_loss(pred_conf[conf_mask_false], tconf[conf_mask_false]) + self.mse_loss(
                 pred_conf[conf_mask_true], tconf[conf_mask_true]
             )
             loss_cls = (1 / batch_size) * self.ce_loss(pred_cls[mask], torch.argmax(tcls[mask], 1))

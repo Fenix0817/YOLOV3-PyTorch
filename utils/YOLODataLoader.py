@@ -79,8 +79,3 @@ def processInputImageLabel(img_shape,img,max_objects,label_path, is_train):
 
 
     return input_img, filled_labels
-
-
-
-
-

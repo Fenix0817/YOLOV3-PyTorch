@@ -18,7 +18,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_config_path',type=str,default='cfg/handsup.cfg',help='location of model config file')
     parser.add_argument('--class_path', type=str, default='data/handsup.names', help='path to class label file')
     parser.add_argument('--data_config_path',type=str,default='cfg/handsup.data',help='location of data config file')
-    parser.add_argument('--checkpoint_path',type=str,default='new_checkpoints/',help='location of checkpoints')
+    parser.add_argument('--checkpoint_path',type=str,default='checkpoint',help='location of checkpoints')
     parser.add_argument('--confidence',type=float,default=0.8,help='object confidence threshold')
     parser.add_argument('--nms_thresh',type=float,default=0.4,help='IOU threshold for non-maxumum suppression')
     parser.add_argument('--use_GPU',type=bool,default=True,help='if use GPU for training')

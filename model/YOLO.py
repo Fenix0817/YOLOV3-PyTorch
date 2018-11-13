@@ -49,8 +49,7 @@ class YOLO(nn.Module):
         self.losses["precision"] /= 3
         return sum(output) if targets is not None else torch.cat(output, 1)
 
-    def loadModel(self, weightfile):
-        
+    def loadModel(self, weightfile):  
         #Open the weights file
         fp = open(weightfile, "rb")
         header = np.fromfile(fp, dtype = np.int32, count = 5)
@@ -68,16 +67,15 @@ class YOLO(nn.Module):
                     batch_normalize = int(self.blocks[i+1]["batch_normalize"])
                 except:
                     batch_normalize = 0
-                
                 conv = model[0]
                 
                 if (batch_normalize):
                     bn = model[1]
                     
-                    #Get the number of weights of Batch Norm Layer
+                    #number of weights of batch norm
                     num_bn_biases = bn.bias.numel()
                     
-                    #Load the weights
+                    #load the weights
                     bn_biases = torch.from_numpy(weights[ptr:ptr + num_bn_biases])
                     ptr += num_bn_biases
                     
@@ -90,37 +88,33 @@ class YOLO(nn.Module):
                     bn_running_var = torch.from_numpy(weights[ptr: ptr + num_bn_biases])
                     ptr  += num_bn_biases
                     
-                    #Cast the loaded weights into dims of model weights. 
+                    #cast the loaded weights into dims of model weights. 
                     bn_biases = bn_biases.view_as(bn.bias.data)
                     bn_weights = bn_weights.view_as(bn.weight.data)
                     bn_running_mean = bn_running_mean.view_as(bn.running_mean)
                     bn_running_var = bn_running_var.view_as(bn.running_var)
 
-                    #Copy the data to model
+                    #copy the data to model
                     bn.bias.data.copy_(bn_biases)
                     bn.weight.data.copy_(bn_weights)
                     bn.running_mean.copy_(bn_running_mean)
                     bn.running_var.copy_(bn_running_var)
                 
                 else:
-                    #Number of biases
                     num_biases = conv.bias.numel()
-                
-                    #Load the weights
+
+                    #the weights
                     conv_biases = torch.from_numpy(weights[ptr: ptr + num_biases])
                     ptr = ptr + num_biases
                     
-                    #reshape the loaded weights according to the dims of the model weights
+                    #reshape the loaded weights
                     conv_biases = conv_biases.view_as(conv.bias.data)
                     
-                    #Finally copy the data
+                    #copy the data
                     conv.bias.data.copy_(conv_biases)
-                    
-                    
-                #Let us load the weights for the Convolutional layers
+
                 num_weights = conv.weight.numel()
-                
-                #Do the same as above for weights
+            
                 conv_weights = torch.from_numpy(weights[ptr:ptr+num_weights])
                 ptr = ptr + num_weights
                 conv_weights = conv_weights.view_as(conv.weight.data)
@@ -128,33 +122,26 @@ class YOLO(nn.Module):
 
     def saveModel(self, savedfile, cutoff = 0):        
         fp = open(savedfile, 'wb')
-        
         self.header[3] = self.seen
         header = self.header
-
         header = header.numpy()
         header.tofile(fp)
         
         for i in range(len(self.module_list)):
             module_type = self.blocks[i+1]["type"]
-            
             if (module_type) == "convolutional":
                 model = self.module_list[i]
                 try:
                     batch_normalize = int(self.blocks[i+1]["batch_normalize"])
                 except:
-                    batch_normalize = 0
-                    
+                    batch_normalize = 0 
                 conv = model[0]
-
                 if (batch_normalize):
                     bn = model[1]
                     bn.bias.data.cpu().numpy().tofile(fp)
                     bn.weight.data.cpu().numpy().tofile(fp)
                     bn.running_mean.cpu().numpy().tofile(fp)
                     bn.running_var.cpu().numpy().tofile(fp)
-                
-            
                 else:
                     conv.bias.data.cpu().numpy().tofile(fp)
                 conv.weight.data.cpu().numpy().tofile(fp)
