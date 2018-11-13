@@ -16,14 +16,14 @@ if __name__ ==  '__main__':
     parser.add_argument("--batch_size", type=int, default=16, help="size of each image batch")
     parser.add_argument("--model_config_path", type=str, default="cfg/yolov3.cfg", help="path to model config file")
     parser.add_argument("--data_config_path", type=str, default="cfg/coco.data", help="path to data config file")
-    parser.add_argument("--weights_path", type=str, default="weights/yolov3.weights", help="path to weights file")
+    parser.add_argument("--weights_path", type=str, default="weights/coco.weights", help="path to weights file")
     parser.add_argument("--class_path", type=str, default="data/coco.names", help="path to class label file")
     parser.add_argument("--iou_thres", type=float, default=0.5, help="iou threshold required to qualify as detected")
     parser.add_argument("--conf_thres", type=float, default=0.5, help="object confidence threshold")
     parser.add_argument("--nms_thres", type=float, default=0.45, help="iou thresshold for non-maximum suppression")
     parser.add_argument("--n_cpu", type=int, default=0, help="number of cpu threads to use during batch generation")
     parser.add_argument("--img_size", type=int, default=416, help="size of each image dimension")
-    parser.add_argument("--use_cuda", type=bool, default=True, help="whether to use cuda if available")
+    parser.add_argument("--use_GPU", type=bool, default=True, help="whether to use cuda if available")
     parameters = parser.parse_args()
 
 
@@ -42,6 +42,7 @@ if __name__ ==  '__main__':
 
     if CUDA:
         model.cuda()
+        FloatTensor = torch.cuda.FloatTensor
 
     model.eval()
 
@@ -52,11 +53,11 @@ if __name__ ==  '__main__':
 
     for batch_i, (_, imgs, targets) in enumerate(tqdm.tqdm(dataloader, desc="Detecting objects")):
 
-        imgs = Variable(imgs.type(Tensor))
+        imgs = Variable(imgs.type(FloatTensor))
 
         with torch.no_grad():
-            outputs = model(imgs)
-            outputs = nonMaxSuppression(outputs, 80, conf_thres=opt.conf_thres, nms_thres=opt.nms_thres)
+            outputs = model(imgs, CUDA)
+            outputs = nonMaxSuppression(outputs, parameters.conf_thres, num_classes, True, parameters.nms_thres).unsqueeze(0)
 
         for output, annotations in zip(outputs, targets):
             # store detections for each class
@@ -91,7 +92,7 @@ if __name__ ==  '__main__':
                 annotation_boxes[:, 1] = _annotation_boxes[:, 1] - _annotation_boxes[:, 3] / 2
                 annotation_boxes[:, 2] = _annotation_boxes[:, 0] + _annotation_boxes[:, 2] / 2
                 annotation_boxes[:, 3] = _annotation_boxes[:, 1] + _annotation_boxes[:, 3] / 2
-                annotation_boxes *= opt.img_size
+                annotation_boxes *= parameters.img_size
 
                 # group targets with the same class together
                 for label in range(num_classes):
@@ -124,7 +125,7 @@ if __name__ ==  '__main__':
                 max_overlap = overlaps[0, assigned_annotation]
 
                 # ingore those iou < threshold
-                if max_overlap >= opt.iou_thres and assigned_annotation not in detected_annotations:
+                if max_overlap >= parameters.iou_thres and assigned_annotation not in detected_annotations:
                     true_positives.append(1)
                     detected_annotations.append(assigned_annotation)
                 else:
@@ -151,7 +152,7 @@ if __name__ ==  '__main__':
         precision = true_positives / np.maximum(true_positives + false_positives, np.finfo(np.float64).eps)
 
         # compute average precision
-        average_precision = compute_ap(recall, precision)
+        average_precision = computeAP(recall, precision)
         # print(average_precision)
         average_precisions[label] = average_precision
 
