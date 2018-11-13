@@ -161,8 +161,6 @@ def nonMaxSuppression(prediction, confidence, num_classes, nms = True, nms_conf 
         image_pred = torch.cat(seq, 1)
         
         non_zero_ind =  (torch.nonzero(image_pred[:,4]))
-
-        
         image_pred_ = image_pred[non_zero_ind.squeeze(),:].view(-1,7)
         
         try:
