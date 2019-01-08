@@ -8,7 +8,7 @@ git clone https://github.com/Ray-Luo/YOLOV3-PyTorch.git
 cd YOLOV3-PyTorch/
 sudo pip3 install -r requirements.txt
 wget https://www.dropbox.com/s/bnwucfzv6torx2t/weights.zip
-wget https://www.dropbox.com/s/qfnd3p47td991vj/sample.zip
+wget https://www.dropbox.com/s/6qihvaqt0aqdlf2/sample.zip
 unzip -q weights.zip
 unzip -q sample.zip
 ```
